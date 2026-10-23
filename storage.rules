@@ -1,0 +1,12 @@
+rules_version = '2';
+service firebase.storage {
+ match /b/{bucket}/o {
+  match /boards/{board}/{uid}/{file} {
+   function member(){return request.auth != null && firestore.exists(/databases/(default)/documents/boards/$(board)/members/$(request.auth.uid));}
+   allow read: if member();
+   allow create: if member() && request.auth.uid == uid && request.resource.size <= 20 * 1024 * 1024 && request.resource.contentType == 'application/pdf' && file.matches('.*[.]pdf');
+   allow update: if false;
+   allow delete: if member() && request.auth.uid == uid;
+  }
+ }
+}

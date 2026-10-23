@@ -1,0 +1,10 @@
+import {execFileSync} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
+const id=process.argv[2]||'vektor-board-egor';
+if(!/^[a-z][a-z0-9-]+$/.test(id))throw Error('Invalid Firebase project ID');
+const result=JSON.parse(execFileSync('firebase',['apps:sdkconfig','WEB','--project',id,'--json'],{encoding:'utf8',stdio:['ignore','pipe','inherit']}));
+const config=result.result.sdkConfig;
+if(!config?.apiKey)throw Error('Firebase web app not found');
+const fields={apiKey:'API_KEY',authDomain:'AUTH_DOMAIN',projectId:'PROJECT_ID',storageBucket:'STORAGE_BUCKET',appId:'APP_ID'};
+writeFileSync('.env.local',Object.entries(fields).map(([key,name])=>`VITE_FIREBASE_${name}=${config[key]||''}`).join('\n')+'\nVITE_PDF_UPLOADS=false\n');
+console.log('Настройки Firebase сохранены в .env.local. Загрузка PDF отключена.');

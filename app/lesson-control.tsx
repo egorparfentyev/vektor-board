@@ -1,0 +1,20 @@
+'use client';
+import React,{useEffect,useState} from 'react';
+type Lesson={goal:string;minutes:number;elapsed:number;startedAt:number;state:'ready'|'running'|'paused'|'finished';notes:string;homework:string;done:boolean};
+const initial:Lesson={goal:'',minutes:60,elapsed:0,startedAt:0,state:'ready',notes:'',homework:'',done:false};
+export function lessonSeconds(lesson:Lesson,now:number){return Math.max(0,Math.floor(lesson.elapsed+(lesson.state==='running'?(now-lesson.startedAt)/1000:0)))}
+const clock=(s:number)=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+export function LessonControl({boardId}:{boardId:string}){
+ const [lesson,setLesson]=useState<Lesson>(initial),[open,setOpen]=useState(false),[now,setNow]=useState(0),[ready,setReady]=useState(false);
+ useEffect(()=>{try{const saved=JSON.parse(localStorage.getItem('vektor-lesson:'+boardId)||'null');if(saved&&['ready','running','paused','finished'].includes(saved.state))setLesson({...initial,...saved})}catch{}setNow(Date.now());setReady(true)},[boardId]);
+ useEffect(()=>{if(ready)localStorage.setItem('vektor-lesson:'+boardId,JSON.stringify(lesson))},[lesson,boardId,ready]);
+ useEffect(()=>{if(lesson.state!=='running')return;const tick=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(tick)},[lesson.state]);
+ const elapsed=lessonSeconds(lesson,now),remaining=Math.max(0,lesson.minutes*60-elapsed),over=elapsed>lesson.minutes*60;
+ function transition(state:Lesson['state']){const time=Date.now();setLesson(l=>({...l,elapsed:lessonSeconds(l,time),startedAt:time,state}));setNow(time)}
+ return <div className="lesson-control"><button className={'timer '+(lesson.state==='running'?'running':'')} onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-label="Управление уроком"><span className="timer-dot"/><b>{lesson.state==='ready'?'Начать урок':lesson.state==='finished'?'Итоги урока':clock(over?elapsed-lesson.minutes*60:remaining)}</b>{lesson.state!=='ready'&&lesson.state!=='finished'&&<span>{over?'сверх плана':lesson.state==='paused'?'пауза':'осталось'}</span>}</button>
+ {open&&<section className="lesson-panel" aria-label="План и время урока"><header><strong>{lesson.state==='finished'?'Итоги занятия':'План занятия'}</strong><button title="Закрыть план урока" onClick={()=>setOpen(false)}>×</button></header><label>Цель на сегодня<input aria-label="Цель урока" placeholder="Например, объяснить закон сохранения энергии" value={lesson.goal} onChange={e=>setLesson({...lesson,goal:e.target.value})}/></label><label>Продолжительность, минут<input aria-label="Длительность урока" type="number" min="5" max="240" value={lesson.minutes} onChange={e=>setLesson({...lesson,minutes:Math.max(5,Math.min(240,Number(e.target.value)||5))})}/></label>
+ {lesson.state!=='ready'&&<><progress max={lesson.minutes*60} value={Math.min(elapsed,lesson.minutes*60)}/><p>Прошло {clock(elapsed)} · {over?'Плановое время истекло':`осталось ${clock(remaining)}`}</p></>}
+ <label className="lesson-check"><input type="checkbox" checked={lesson.done} onChange={e=>setLesson({...lesson,done:e.target.checked})}/>Цель занятия достигнута</label><label>Что разобрали<textarea aria-label="Заметки урока" rows={2} placeholder="Ключевые выводы и сложные места" value={lesson.notes} onChange={e=>setLesson({...lesson,notes:e.target.value})}/></label><label>К следующему занятию<textarea aria-label="Задание после урока" rows={2} value={lesson.homework} onChange={e=>setLesson({...lesson,homework:e.target.value})}/></label>
+ <div className="lesson-actions">{lesson.state==='ready'?<button className="primary" onClick={()=>{transition('running');setOpen(false)}}>Начать занятие</button>:lesson.state==='finished'?<button className="primary" onClick={()=>setLesson(initial)}>Новое занятие</button>:<><button className="primary" onClick={()=>transition(lesson.state==='running'?'paused':'running')}>{lesson.state==='running'?'Пауза':'Продолжить'}</button><button className="secondary" onClick={()=>transition('finished')}>Завершить урок</button></>}</div><small>План и заметки сохраняются на этом устройстве. Пауза не учитывается во времени урока.</small></section>}
+ </div>
+}

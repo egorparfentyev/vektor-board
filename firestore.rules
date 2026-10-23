@@ -1,0 +1,48 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signed(){return request.auth != null;}
+  function member(b){return signed() && exists(/databases/$(database)/documents/boards/$(b)/members/$(request.auth.uid));}
+  function owner(b){return signed() && get(/databases/$(database)/documents/boards/$(b)).data.owner == request.auth.uid;}
+  match /boards/{b} {
+   allow get: if member(b);
+   allow list: if false;
+   allow create: if signed() && request.resource.data.keys().hasOnly(['title','owner','createdAt']) && request.resource.data.owner == request.auth.uid && request.resource.data.title is string && request.resource.data.title.size() <= 120;
+   allow update: if owner(b) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title']) && request.resource.data.title is string && request.resource.data.title.size() <= 120;
+   allow delete: if false;
+   match /members/{uid} {
+    allow get: if signed() && (uid == request.auth.uid || member(b));
+    allow list: if member(b);
+    allow create: if signed() && uid == request.auth.uid && request.resource.data.user == uid && request.resource.data.name is string && request.resource.data.name.size() <= 100 && request.resource.data.keys().hasOnly(['user','name','role','inviteToken']) && (
+      (getAfter(/databases/$(database)/documents/boards/$(b)).data.owner == uid && request.resource.data.role == 'teacher') ||
+      (request.resource.data.role == 'student' && request.resource.data.inviteToken is string && get(/databases/$(database)/documents/invites/$(request.resource.data.inviteToken)).data.board == b)
+    );
+    allow update,delete: if false;
+   }
+   match /private/{key} {
+    allow read: if owner(b);
+    allow create: if signed() && getAfter(/databases/$(database)/documents/boards/$(b)).data.owner == request.auth.uid && key == 'invite' && request.resource.data.keys().hasOnly(['token']);
+    allow update,delete: if false;
+   }
+   match /items/{id} {
+    allow read: if member(b);
+    allow create: if member(b) && request.resource.data.owner == request.auth.uid && validItem();
+    allow update: if member(b) && resource.data.owner == request.auth.uid && request.resource.data.owner == resource.data.owner && validItem();
+    allow delete: if member(b) && resource.data.owner == request.auth.uid;
+    function validItem(){return request.resource.data.keys().hasOnly(['owner','payload','updatedAt']) && request.resource.data.payload is string && request.resource.data.payload.size() <= 900000;}
+   }
+   match /students/{id} {
+    allow read: if member(b);
+    allow create,update: if owner(b) && request.resource.data.keys().hasOnly(['payload']) && request.resource.data.payload is string && request.resource.data.payload.size() <= 30000;
+    allow delete: if owner(b);
+   }
+  }
+  match /{path=**}/members/{uid} {allow read: if signed() && resource.data.user == request.auth.uid;}
+  match /invites/{token} {
+   allow get: if signed();
+   allow list: if false;
+   allow create: if signed() && token.size() >= 40 && request.resource.data.keys().hasOnly(['board','owner','title']) && request.resource.data.owner == request.auth.uid && getAfter(/databases/$(database)/documents/boards/$(request.resource.data.board)).data.owner == request.auth.uid;
+   allow update,delete: if false;
+  }
+ }
+}

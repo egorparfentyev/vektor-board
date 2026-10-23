@@ -1,0 +1,1 @@
+{"indexes":[],"fieldOverrides":[{"collectionGroup":"members","fieldPath":"user","indexes":[{"order":"ASCENDING","queryScope":"COLLECTION_GROUP"}]},{"collectionGroup":"items","fieldPath":"payload","indexes":[]},{"collectionGroup":"students","fieldPath":"payload","indexes":[]}]}

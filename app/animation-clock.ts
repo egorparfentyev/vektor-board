@@ -1,0 +1,8 @@
+'use client';
+import {useEffect,useState,type RefObject} from 'react';
+// A single 60 fps clock for visible models. Time still comes from wall clock.
+const listeners=new Set<(now:number)=>void>();let frame=0,last=0,watching=false;
+function tick(time:number){frame=0;if(document.hidden||!listeners.size)return;const elapsed=time-last,interval=1000/60;if(elapsed>=interval){last=time-elapsed%interval;const now=Date.now();listeners.forEach(fn=>fn(now))}frame=requestAnimationFrame(tick)}
+function resume(){if(document.hidden){cancelAnimationFrame(frame);frame=0}else if(listeners.size&&!frame){last=0;frame=requestAnimationFrame(tick)}}
+function subscribe(fn:(now:number)=>void){listeners.add(fn);if(!watching){document.addEventListener('visibilitychange',resume);watching=true}resume();return()=>{listeners.delete(fn);if(!listeners.size){cancelAnimationFrame(frame);frame=0;document.removeEventListener('visibilitychange',resume);watching=false}}}
+export function useAnimationClock(ref:RefObject<SVGSVGElement|null>,playing:boolean){const [clock,setClock]=useState(()=>Date.now());useEffect(()=>{if(!playing)return;let stop:(()=>void)|undefined;const activate=(visible:boolean)=>{if(visible&&!stop){setClock(Date.now());stop=subscribe(setClock)}else if(!visible&&stop){stop();stop=undefined}};if(typeof IntersectionObserver==='undefined'){activate(true);return()=>stop?.()}const observer=new IntersectionObserver(entries=>activate(entries.some(e=>e.isIntersecting)),{rootMargin:'80px'});if(ref.current)observer.observe(ref.current);return()=>{observer.disconnect();stop?.()}},[playing,ref]);return clock}
