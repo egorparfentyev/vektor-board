@@ -53,7 +53,8 @@
           }
         ]
       }
-    ]
+    ],
+    "site": "vektor-board"
   },
   "firestore": {
     "rules": "firestore.rules",
