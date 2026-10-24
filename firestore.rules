@@ -19,6 +19,15 @@ service cloud.firestore {
     );
     allow update,delete: if false;
    }
+   function validView(v){return v.keys().hasOnly(['x','y','zoom','notebook','page']) && v.x is number && v.y is number && v.x >= -10000000 && v.x <= 10000000 && v.y >= -10000000 && v.y <= 10000000 && v.zoom is number && v.zoom >= 0.01 && v.zoom <= 20 && (v.notebook == null || v.notebook is string) && v.page is int && v.page >= 0 && v.page < 10000;}
+   match /presence/{uid} {
+    allow read: if member(b);
+    allow create,update: if member(b) && uid == request.auth.uid && request.resource.data.keys().hasOnly(['view','updatedAt']) && validView(request.resource.data.view) && request.resource.data.updatedAt == request.time;
+   }
+   match /viewRequests/{uid} {
+    allow read: if member(b) && (uid == request.auth.uid || owner(b));
+    allow create,update: if owner(b) && exists(/databases/$(database)/documents/boards/$(b)/members/$(uid)) && request.resource.data.keys().hasOnly(['id','view','createdAt']) && request.resource.data.id is string && validView(request.resource.data.view) && request.resource.data.createdAt == request.time;
+   }
    match /private/{key} {
     allow read: if owner(b);
     allow create: if signed() && getAfter(/databases/$(database)/documents/boards/$(b)).data.owner == request.auth.uid && key == 'invite' && request.resource.data.keys().hasOnly(['token']);

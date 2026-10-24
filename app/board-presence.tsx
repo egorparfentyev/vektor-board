@@ -1,0 +1,13 @@
+import React,{useEffect,useRef,useState} from 'react';
+import {collection,doc,onSnapshot,setDoc,serverTimestamp} from 'firebase/firestore';
+import {db} from '../src/firebase';
+type View={x:number;y:number;zoom:number;notebook:string|null;page:number};
+export function BoardPresence(p:{board:string;uid:string;teacher:boolean;members:any[];getView:()=>View;go:(v:View)=>boolean|void;notify:(s:string)=>void}){
+ const latest=useRef(p);latest.current=p;
+ const [open,setOpen]=useState(false),[rows,setRows]=useState<any[]>([]),[error,setError]=useState('');
+ useEffect(()=>{const started=Date.now();let alive=true,last='',sent=0;const report=()=>{if(document.hidden)return;const view=latest.current.getView(),encoded=JSON.stringify(view);if(encoded===last&&Date.now()-sent<20000)return;last=encoded;sent=Date.now();setDoc(doc(db,'boards',p.board,'presence',p.uid),{view,updatedAt:serverTimestamp()}).catch(()=>{last='';if(alive)setError('Не удалось обновить положение. Проверьте соединение.')})};report();const timer=setInterval(report,2000);
+ const stop=onSnapshot(collection(db,'boards',p.board,'presence'),s=>{setRows(s.docs.map(d=>({uid:d.id,...d.data()})));setError('')},()=>setError('Нет соединения с участниками'));
+ let seen='';const commands=onSnapshot(doc(db,'boards',p.board,'viewRequests',p.uid),s=>{const d=s.data();if(!d||d.id===seen)return;seen=d.id;if(d.createdAt?.toMillis()<started||!d.createdAt)return;if(latest.current.go(d.view)!==false)latest.current.notify('Преподаватель пригласил вас к своему обзору')},()=>setError('Не удалось подключить переходы'));
+ return()=>{alive=false;clearInterval(timer);stop();commands()};},[p.board,p.uid]);
+ return <div className="presence-control"><button className="secondary" onClick={()=>setOpen(!open)}>Участники · {p.members.length}</button>{open&&<div className="presence-menu"><strong>Совместная работа</strong><p>Переход меняет только обзор, элементы остаются на месте.</p>{error&&<p role="alert">{error}</p>}{p.members.filter(m=>m.user!==p.uid).map(m=>{const row=rows.find(r=>r.uid===m.user),active=row?.updatedAt?.toMillis()>Date.now()-45000;return <div key={m.user}><b>{m.name}</b><small>{active?'На доске':'Не в сети'}</small><button disabled={!active} onClick={()=>{p.go(row.view);setOpen(false)}}>{p.teacher?'К ученику':'К участнику'}</button>{p.teacher&&<button disabled={!active} onClick={async()=>{try{await setDoc(doc(db,'boards',p.board,'viewRequests',m.user),{id:crypto.randomUUID(),view:p.getView(),createdAt:serverTimestamp()});p.notify('Обзор отправлен ученику')}catch{p.notify('Не удалось отправить обзор')}}}>Ко мне</button>}</div>})}{p.members.length<2&&<p>Пригласите ученика по ссылке на доску.</p>}</div>}</div>
+}
