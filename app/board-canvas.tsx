@@ -33,6 +33,8 @@ export function BoardCanvas(p:Props){
  if(o?.type==='notebook'&&target.closest('[data-open-notebook]')){p.onOpenNotebook(o.id);return}
  if(o&&!own(o)){p.notify(o.locked?'Элемент заблокирован — разблокируйте его в слоях':'Чужие элементы можно просматривать, но нельзя изменять');return}
  if(!o){if(!e.shiftKey)p.setSelection([]);p.gesture.current={...base,type:'marquee',start:pt,previous:e.shiftKey?p.selection:[]};setRegion({...pt,w:0,h:0});return}
+ if(o.groupId&&!(p.selection.length===1&&p.selected===o.id)&&!e.altKey&&!e.shiftKey&&!target.closest('[data-resize],[data-geo],[data-end],[data-unit],[data-graph-probe],[data-physics-handle]')){const group=p.items.filter(x=>x.groupId===o.groupId&&x.scope===p.scope&&own(x));if(group.length>1){p.setSelection(group.map(x=>x.id));p.gesture.current={...base,type:'groupMove',start:pt,beforeGroup:group.map(x=>structuredClone(x))};return}}
+ if(e.altKey){p.setSelected(o.id);p.gesture.current={...base,type:'move',start:pt,before:structuredClone(o)};return}
  if(e.shiftKey){p.setSelection(p.selection.includes(o.id)?p.selection.filter(id=>id!==o.id):[...p.selection,o.id]);return}
  if(!p.selection.includes(o.id))p.setSelected(o.id);
  const resize=target.closest('[data-resize]')?.getAttribute('data-resize'),end=target.closest('[data-end]')?.getAttribute('data-end'),unit=target.closest('[data-unit]'),geo=target.closest('[data-geo]')?.getAttribute('data-geo'),probe=target.closest('[data-graph-probe]'),physics=target.closest('[data-physics-handle]')?.getAttribute('data-physics-handle');
